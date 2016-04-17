@@ -4,6 +4,7 @@ from time import sleep
 from random import randrange
 
 device = led.matrix()
+device.brightness(3)
 buffLen = len(device._buffer) - 1
 GPIO.setmode(GPIO.BOARD)
 

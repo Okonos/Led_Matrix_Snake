@@ -1,30 +1,54 @@
 import max7219.led as led
 import RPi.GPIO as GPIO
 from time import sleep
+from random import randrange
 
 device = led.matrix()
+buffLen = len(device._buffer) - 1
 GPIO.setmode(GPIO.BOARD)
 
 def setPixel(x, y):
 	device.pixel(x, y, 1)
 
-#def unset??
+def clearPixel(x, y):
+	device.pixel(x, y, 0)
 
 def upCallback(channel):
-	if snake.direction != Snake.Direction.DOWN:
-		snake.direction = Snake.Direction.UP
+	if snake.direction not in (Snake.Direction.DOWN, Snake.Direction.UP):
+		snake.instantTurningMovement(Snake.Direction.UP)
 
 def rightCallback(channel):
-	if snake.direction != Snake.Direction.LEFT:
-		snake.direction = Snake.Direction.RIGHT	
+	if snake.direction not in (Snake.Direction.LEFT,Snake.Direction.RIGHT):
+		snake.instantTurningMovement(Snake.Direction.RIGHT)
 
 def downCallback(channel):
-	if snake.direction != Snake.Direction.UP:
-		snake.direction = Snake.Direction.DOWN
+	if snake.direction not in (Snake.Direction.UP, Snake.Direction.DOWN):
+		snake.instantTurningMovement(Snake.Direction.DOWN)
 
 def leftCallback(channel):
-	if snake.direction != Snake.Direction.RIGHT:
-		snake.direction = Snake.Direction.LEFT
+	if snake.direction not in (Snake.Direction.RIGHT,Snake.Direction.LEFT):
+		snake.instantTurningMovement(Snake.Direction.LEFT)
+
+class Food:
+	def __init__(self):
+		self.location = 0 
+		self.spawn()
+
+	def spawn(self):
+		colliding = True
+		while colliding:	
+			colliding = False
+			x = randrange(0, buffLen)
+			y = randrange(0, buffLen)
+			self.location = (x, y)
+			for segment in snake.segments:
+				if self.location == segment.getCoords(): 
+					colliding = True
+					break
+
+	def draw(self):
+		setPixel(*self.location)
+	
 
 class Snake:
 	class Direction:
@@ -48,19 +72,19 @@ class Snake:
 	def __init__(self):
 		self.direction = self.Direction.DOWN
 		self.collided = False
+		self.foodConsumed = False
 		self.segments = []
 		self.segments.append(self.Segment(4, 3))
 		self.segments.append(self.Segment(3, 3))
 		self.segments.append(self.Segment(2, 3))
 		self.segments.append(self.Segment(1, 3))
-		self.segments.append(self.Segment(0, 3))
+		#self.segments.append(self.Segment(0, 3))
 
 	def draw(self):
-		for s in self.segments:
-			setPixel(*(s.getCoords()))
-
+		# Only head changed place
+		setPixel(*self.segments[0].getCoords())
+		
 	def checkCollisions(self, head):
-		buffLen = len(device._buffer) - 1
 		# Wall collision
 		if (
 			head.y == 0 and self.direction == self.Direction.UP or
@@ -77,11 +101,11 @@ class Snake:
 
 		if self.checkCollisions(head):
 			self.collided = True
-			device.show_message("Dupa!")
 			return
 
 		self.segments.insert(0, self.segments.pop())
-
+		tail = self.segments[0].getCoords()
+		
 		if self.direction == self.Direction.UP:
 			self.segments[0] = self.Segment(head.x, head.y-1)
 		elif self.direction == self.Direction.RIGHT:
@@ -96,8 +120,26 @@ class Snake:
 			if self.segments[0].getCoords() == segment.getCoords():
 				self.collided = True
 
+		# Food collision/consumption
+		if self.segments[0].getCoords() == food.location:
+			self.segments.insert(0, self.Segment(*food.location))
+			self.foodConsumed = True
+
+		# Clear the tail if it's not consumed food
+		if self.segments[-1].getCoords() != tail:
+			clearPixel(*tail) 
+
+	def instantTurningMovement(self, direction):
+		self.direction = direction
+		self.move()
+		self.draw()
+
 
 snake = Snake()
+# Initial draw
+for segment in snake.segments:
+	setPixel(*segment.getCoords())
+food = Food()
 GPIO.setup(35, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(36, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(37, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
@@ -109,8 +151,11 @@ GPIO.add_event_detect(38, GPIO.RISING, callback=rightCallback,bouncetime=300)
 
 try:
 	while not snake.collided:
-		device.clear()
+		if snake.foodConsumed:
+			snake.foodConsumed = False
+			food.spawn()
 		snake.draw()
+		food.draw()
 		sleep(1)
 		snake.move()
 except KeyboardInterrupt:

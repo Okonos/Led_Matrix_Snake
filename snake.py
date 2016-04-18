@@ -88,7 +88,6 @@ class Snake:
 		self.segments.append(self.Segment(3, 3))
 		self.segments.append(self.Segment(2, 3))
 		self.segments.append(self.Segment(1, 3))
-		#self.segments.append(self.Segment(0, 3))
 
 	def draw(self):
 		# Only head changed place
@@ -134,6 +133,8 @@ class Snake:
 		if self.segments[0].getCoords() == food.location:
 			self.segments.insert(0, self.Segment(*food.location))
 			self.foodConsumed = True
+			thread = threading.Thread(target=self.playConsumeAnimation)
+			thread.start()
 
 		# Clear the tail if it's not consumed food
 		if self.segments[-1].getCoords() != tail:
@@ -144,7 +145,14 @@ class Snake:
 		self.move()
 		self.draw()
 
-	def playAnimation(self, n):
+	def playConsumeAnimation(self):
+		for s in self.segments:
+			clearPixel(*s.getCoords())
+		sleep(0.1)
+		for s in self.segments:
+			setPixel(*s.getCoords())
+
+	def playDeathAnimation(self, n):
 		for _ in range(n):
 			for s in self.segments:
 				clearPixel(*s.getCoords())			
@@ -164,7 +172,7 @@ GPIO.add_event_detect(37, GPIO.RISING, callback=upCallback,bouncetime=300)
 GPIO.add_event_detect(38, GPIO.RISING, callback=rightCallback,bouncetime=300)
 
 snake = Snake()
-snake.playAnimation(3)
+snake.playDeathAnimation(3)
 food = Food()
 
 try:
@@ -180,7 +188,7 @@ except KeyboardInterrupt:
 	sleep(3)
 	device.clear()
 
-snake.playAnimation(2)
+snake.playDeathAnimation(2)
 GPIO.cleanup()
 sleep(3)
 device.clear()

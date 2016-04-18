@@ -2,6 +2,7 @@ import max7219.led as led
 import RPi.GPIO as GPIO
 from time import sleep
 from random import randrange
+import threading
 
 device = led.matrix()
 device.brightness(3)
@@ -47,9 +48,17 @@ class Food:
 					colliding = True
 					break
 
+		self.thread = threading.Thread(target=self.draw)
+		self.thread.start()
+
 	def draw(self):
+		for _ in range(2):
+			setPixel(*self.location)
+			sleep(0.3)
+			clearPixel(*self.location)
+			sleep(0.3)
 		setPixel(*self.location)
-	
+
 
 class Snake:
 	class Direction:
@@ -71,7 +80,7 @@ class Snake:
 			self.y = y
 	
 	def __init__(self):
-		self.direction = self.Direction.DOWN
+		self.direction = self.Direction.RIGHT
 		self.collided = False
 		self.foodConsumed = False
 		self.segments = []
@@ -135,12 +144,16 @@ class Snake:
 		self.move()
 		self.draw()
 
+	def playAnimation(self, n):
+		for _ in range(n):
+			for s in self.segments:
+				clearPixel(*s.getCoords())			
+			sleep(0.3)
+			for s in self.segments:
+				setPixel(*s.getCoords())
+			sleep(0.3)
 
-snake = Snake()
-# Initial draw
-for segment in snake.segments:
-	setPixel(*segment.getCoords())
-food = Food()
+
 GPIO.setup(35, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(36, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(37, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
@@ -150,13 +163,16 @@ GPIO.add_event_detect(36, GPIO.RISING, callback=downCallback,bouncetime=300)
 GPIO.add_event_detect(37, GPIO.RISING, callback=upCallback,bouncetime=300)
 GPIO.add_event_detect(38, GPIO.RISING, callback=rightCallback,bouncetime=300)
 
+snake = Snake()
+snake.playAnimation(3)
+food = Food()
+
 try:
 	while not snake.collided:
 		if snake.foodConsumed:
 			snake.foodConsumed = False
 			food.spawn()
 		snake.draw()
-		food.draw()
 		sleep(1)
 		snake.move()
 except KeyboardInterrupt:
@@ -164,6 +180,7 @@ except KeyboardInterrupt:
 	sleep(3)
 	device.clear()
 
+snake.playAnimation(2)
 GPIO.cleanup()
 sleep(3)
 device.clear()
